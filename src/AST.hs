@@ -1,15 +1,12 @@
 module AST where
 
-import Data.List (sort)
+import Alias
+import Error
+-- import Data.Either.Validation (Validation(..))
+import Data.List (intersect, sort)
 
-type Column   = Integer
-type Line     = Integer
-type FileName = String
-
-data Loc = FileLoc FileName Line Colum
+data Loc = FileLoc FileName Line Column
          deriving (Eq, Show)
-
-type Symbol = String
 
 data Expr = IntVal Int
           | StrVal String
@@ -28,6 +25,18 @@ class GetSymRefs a where
 class GetSymDef a where
     getSymDef :: a -> Symbol
 
+class GetSymDefs a where
+    getSymDefs :: a -> [Symbol]
+
+instance GetSymDefs Block where
+    getSymDefs (Block stmts) = concat $ getSymDefs <$> stmts
+
+instance GetSymRefs Block where
+    getSymRefs (Block stmts) = concat $ getSymRefs <$> stmts
+
+instance GetSymDefs Stmt where
+    getSymDefs (Let sym _) = [sym]
+
 instance GetSymRefs Expr where
     getSymRefs (SymVal s) = [s]
     getSymRefs (BinOp _ l r) = getSymRefs l ++ getSymRefs r
@@ -36,24 +45,22 @@ instance GetSymRefs Expr where
 instance GetSymRefs Stmt where
     getSymRefs (Let _ expr) = getSymRefs expr
 
-instance GetSymDef Stmt where
-    getSymDef (Let sym _) = sym
-
 splitSymRefs :: Stmt -> ([Symbol], Stmt)
 splitSymRefs stmt = (getSymRefs stmt, stmt)
 
 data SplitSyms = SplitSyms
-   { getSplSymDef  :: Symbol
+   { getSplSymDefs :: [Symbol]
    , getSplSymRefs :: [Symbol]
    , getSlpStmt    :: Stmt
    } deriving (Eq, Show)
 
 instance Ord SplitSyms where
-    (<=) x@(SplitSyms def _ _) y@(SplitSyms _ refs _) =
-        elem def refs
+    (<=) (SplitSyms defs _ _) (SplitSyms _ refs _) =
+        let i = defs `intersect` refs
+         in length i > 0
 
 splitSyms :: Stmt -> SplitSyms
-splitSyms stmt = SplitSyms (getSymDef stmt) (getSymRefs stmt) stmt
+splitSyms stmt = SplitSyms (getSymDefs stmt) (getSymRefs stmt) stmt
 
 sortBySymDef :: [Stmt] -> [Stmt]
 sortBySymDef stmts =
@@ -67,6 +74,8 @@ sortBySymDef stmts =
 -------------------------------------------------------------------
 -------------------------------------------------------------------
 
+validateAllSymbolsDefined :: Block -> Either Error Block
+validateAllSymbolsDefined block = undefined
 
 -- findUndefSyms :: [Symbol] -> [Stmt] -> [([Symbol], Stmt)]
 -- findUndefSyms allSymDefs stmts =

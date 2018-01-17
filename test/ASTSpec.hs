@@ -6,6 +6,42 @@ import Test.Hspec
 
 spec :: Spec
 spec = do
+    describe "Block" $ do
+        describe "GetSymDefs" $ do
+            context "when Block contains no symbol defs" $ do
+                describe "getSymDefs" $ do
+
+                    let blockWithoutSymDefs = Block []
+
+                    it "gives an empty list" $ do
+                        getSymDefs blockWithoutSymDefs `shouldBe` []
+
+            context "when Block contains symbol defs" $ do
+
+                    let blockWithSymDefs = Block [Let "x" (IntVal 5), Let "z" (StrVal "Test")]
+
+                    it "gives the symbols defined" $ do
+                        getSymDefs blockWithSymDefs `shouldBe` ["x", "z"]
+
+        describe "GetSymRefs" $ do
+            context "when Block contains no symbol refs" $ do
+                describe "getSymRefs" $ do
+
+                    let blockWithoutSymRefs = Block [Let "x" (IntVal 5), Let "z" (StrVal "Test")]
+
+                    it "gives an empty list" $ do
+                        getSymRefs blockWithoutSymRefs `shouldBe` []
+            context "when Block contains symbol refs" $ do
+                describe "getSymRefs" $ do
+
+                    let blockWithSymRefs = Block [ Let "a" (SymVal "x")
+                                                 , Let "b" (BinOp "+" (BinOp "-" (SymVal "y") (IntVal 5)) (SymVal "x"))
+                                                 ]
+                    let expectatiopn = ["x", "y", "x"]
+
+                    it "gives the symbols referenced" $ do
+                        getSymRefs blockWithSymRefs `shouldBe` expectatiopn
+
     describe "Expr" $ do
         describe "GetSymRefs" $ do
             context "when Expr contains no symbol refs" $ do
@@ -24,10 +60,10 @@ spec = do
                         \(expr, symRefs) -> getSymRefs expr `shouldBe` symRefs
 
     describe "Stmt" $ do
-        describe "GetSymDef" $ do
-            describe "getSymDef" $ do
-                it "gives the symbol defined" $ do
-                    getSymDef (Let "x" (IntVal 10)) `shouldBe` "x"
+        describe "GetSymDefs" $ do
+            describe "getSymDefs" $ do
+                it "gives the symbols defined" $ do
+                    getSymDefs (Let "x" (IntVal 10)) `shouldBe` ["x"]
         describe "GetSymRefs" $ do
             context "when Stmt contains no symbol refs" $ do
                 describe "getSymRefs" $ do
