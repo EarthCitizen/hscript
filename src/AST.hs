@@ -2,71 +2,56 @@ module AST where
 
 import Alias
 import Error
--- import Data.Either.Validation (Validation(..))
-import Data.List (intersect, sort)
+import Data.Coerce (coerce)
+import Data.List ((\\), intersect, sort)
+
+data Parsed
+data Sorted
+data Validated
 
 data Loc = FileLoc FileName Line Column
          deriving (Eq, Show)
 
-data Expr = IntVal Int
-          | StrVal String
-          | SymVal Symbol
-          | BinOp String Expr Expr
+data Expr = IntLit Int
+          | StrLit String
+          | VarRef Identifier
+          | BinOp  String Expr Expr
           deriving (Eq, Show)
 
-data Stmt = Let Symbol Expr
+data Stmt = Let Identifier Expr
           deriving (Eq, Show)
 
-data Block = Block [Stmt] deriving (Eq, Show)
+data Block a = Block [Stmt] deriving (Eq, Show)
 
-class GetSymRefs a where
-    getSymRefs :: a -> [Symbol]
+class GetVarRefs a where
+    getVarRefs :: a -> [Identifier]
 
-class GetSymDef a where
-    getSymDef :: a -> Symbol
+class GetVarDefs a where
+    getVarDefs :: a -> [Identifier]
 
-class GetSymDefs a where
-    getSymDefs :: a -> [Symbol]
+instance GetVarDefs (Block a) where
+    getVarDefs (Block stmts) = concat $ getVarDefs <$> stmts
 
-instance GetSymDefs Block where
-    getSymDefs (Block stmts) = concat $ getSymDefs <$> stmts
+instance GetVarRefs (Block a) where
+    getVarRefs (Block stmts) = concat $ getVarRefs <$> stmts
 
-instance GetSymRefs Block where
-    getSymRefs (Block stmts) = concat $ getSymRefs <$> stmts
+instance GetVarDefs Stmt where
+    getVarDefs (Let var _) = [var]
 
-instance GetSymDefs Stmt where
-    getSymDefs (Let sym _) = [sym]
+instance GetVarRefs Expr where
+    getVarRefs (VarRef s) = [s]
+    getVarRefs (BinOp _ l r) = getVarRefs l ++ getVarRefs r
+    getVarRefs _ = []
 
-instance GetSymRefs Expr where
-    getSymRefs (SymVal s) = [s]
-    getSymRefs (BinOp _ l r) = getSymRefs l ++ getSymRefs r
-    getSymRefs _ = []
+instance GetVarRefs Stmt where
+    getVarRefs (Let _ expr) = getVarRefs expr
 
-instance GetSymRefs Stmt where
-    getSymRefs (Let _ expr) = getSymRefs expr
-
-splitSymRefs :: Stmt -> ([Symbol], Stmt)
-splitSymRefs stmt = (getSymRefs stmt, stmt)
-
-data SplitSyms = SplitSyms
-   { getSplSymDefs :: [Symbol]
-   , getSplSymRefs :: [Symbol]
-   , getSlpStmt    :: Stmt
-   } deriving (Eq, Show)
-
-instance Ord SplitSyms where
-    (<=) (SplitSyms defs _ _) (SplitSyms _ refs _) =
-        let i = defs `intersect` refs
-         in length i > 0
-
-splitSyms :: Stmt -> SplitSyms
-splitSyms stmt = SplitSyms (getSymDefs stmt) (getSymRefs stmt) stmt
-
-sortBySymDef :: [Stmt] -> [Stmt]
-sortBySymDef stmts =
-    let splSyms = splitSyms <$> stmts
-        sorted  = sort splSyms
-     in getSlpStmt <$> sorted
+sortByVarDef :: (GetVarDefs a, GetVarRefs a) => a -> a -> Ordering
+sortByVarDef x y =
+    let i = getVarDefs x `intersect` getVarRefs y
+     in if length i > 0
+        then LT
+        else GT
 
 -------------------------------------------------------------------
 -------------------------------------------------------------------
@@ -74,13 +59,28 @@ sortBySymDef stmts =
 -------------------------------------------------------------------
 -------------------------------------------------------------------
 
-validateAllSymbolsDefined :: Block -> Either Error Block
-validateAllSymbolsDefined block = undefined
+validate :: Block Sorted -> Either Error (Block Validated)
+validate b = coerce $ validateAllVarsDefined b >>= validateVarsDefinedOnce
 
--- findUndefSyms :: [Symbol] -> [Stmt] -> [([Symbol], Stmt)]
--- findUndefSyms allSymDefs stmts =
---     let splSymRefs = splitSymRefs <$> stmts
---         isUndefSym = (\s -> notElem s allSymDefs)
---         slpWthUndef = filter (\spl -> any isUndefSym $ fst spl) splSymRefs
---         onlyUndefSym = (\(syms, sts) -> (filter isUndefSym syms, sts)) <$> slpWthUndef
---      in filter (\spl -> fst spl /= []) onlyUndefSym
+validateAllVarsDefined :: Block Sorted -> Either Error (Block Sorted)
+validateAllVarsDefined block =
+    let varDefs = getVarDefs block
+        varRefs = getVarRefs block
+        undefs  = varRefs \\ varDefs
+     in case undefs of
+            [] -> Right block
+            _  -> Left $ VarUndefinedError $ head undefs
+
+validateVarsDefinedOnce :: Block Sorted -> Either Error (Block Sorted)
+validateVarsDefinedOnce block@(Block stmts) =
+    case go [] stmts of
+        Just s  -> Left $ VarRedefinitionError s
+        Nothing -> Right block
+    where go :: [Identifier] -> [Stmt] -> Maybe Identifier
+          go _ [] = Nothing
+          go preDefs (s:ss) =
+              let stmtDefs = getVarDefs s
+                  dupDefs = intersect preDefs stmtDefs
+               in if dupDefs == []
+                  then go (preDefs ++ stmtDefs) ss
+                  else Just $ head dupDefs

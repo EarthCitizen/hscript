@@ -1,87 +1,120 @@
 module ASTSpec where
 
 import AST
+import Error
 import Control.Monad (forM_)
+import Data.List (sortBy)
 import Test.Hspec
 
 spec :: Spec
 spec = do
     describe "Block" $ do
-        describe "GetSymDefs" $ do
-            context "when Block contains no symbol defs" $ do
-                describe "getSymDefs" $ do
+        describe "GetVarDefs" $ do
+            context "when Block contains no Identifier defs" $ do
+                describe "getVarDefs" $ do
 
-                    let blockWithoutSymDefs = Block []
-
-                    it "gives an empty list" $ do
-                        getSymDefs blockWithoutSymDefs `shouldBe` []
-
-            context "when Block contains symbol defs" $ do
-
-                    let blockWithSymDefs = Block [Let "x" (IntVal 5), Let "z" (StrVal "Test")]
-
-                    it "gives the symbols defined" $ do
-                        getSymDefs blockWithSymDefs `shouldBe` ["x", "z"]
-
-        describe "GetSymRefs" $ do
-            context "when Block contains no symbol refs" $ do
-                describe "getSymRefs" $ do
-
-                    let blockWithoutSymRefs = Block [Let "x" (IntVal 5), Let "z" (StrVal "Test")]
+                    let blockWithoutVarDefs = Block []
 
                     it "gives an empty list" $ do
-                        getSymRefs blockWithoutSymRefs `shouldBe` []
-            context "when Block contains symbol refs" $ do
-                describe "getSymRefs" $ do
+                        getVarDefs blockWithoutVarDefs `shouldBe` []
 
-                    let blockWithSymRefs = Block [ Let "a" (SymVal "x")
-                                                 , Let "b" (BinOp "+" (BinOp "-" (SymVal "y") (IntVal 5)) (SymVal "x"))
+            context "when Block contains Identifier defs" $ do
+
+                    let blockWithVarDefs = Block [Let "x" (IntLit 5), Let "z" (StrLit "Test")]
+
+                    it "gives the Identifiers defined" $ do
+                        getVarDefs blockWithVarDefs `shouldBe` ["x", "z"]
+
+        describe "GetVarRefs" $ do
+            context "when Block contains no Identifier refs" $ do
+                describe "getVarRefs" $ do
+
+                    let blockWithoutVarRefs = Block [Let "x" (IntLit 5), Let "z" (StrLit "Test")]
+
+                    it "gives an empty list" $ do
+                        getVarRefs blockWithoutVarRefs `shouldBe` []
+            context "when Block contains Identifier refs" $ do
+                describe "getVarRefs" $ do
+
+                    let blockWithVarRefs = Block [ Let "a" (VarRef "x")
+                                                 , Let "b" (BinOp "+" (BinOp "-" (VarRef "y") (IntLit 5)) (VarRef "x"))
                                                  ]
                     let expectatiopn = ["x", "y", "x"]
 
-                    it "gives the symbols referenced" $ do
-                        getSymRefs blockWithSymRefs `shouldBe` expectatiopn
+                    it "gives the Identifiers referenced" $ do
+                        getVarRefs blockWithVarRefs `shouldBe` expectatiopn
 
     describe "Expr" $ do
-        describe "GetSymRefs" $ do
-            context "when Expr contains no symbol refs" $ do
-                describe "getSymRefs" $ do
+        describe "GetVarRefs" $ do
+            context "when Expr contains no Identifier refs" $ do
+                describe "getVarRefs" $ do
 
-                    let exprsWithoutSymRefs = [IntVal 5, StrVal "Test", BinOp "+" (IntVal 5) (IntVal 6)]
+                    let exprsWithoutVarRefs = [IntLit 5, StrLit "Test", BinOp "+" (IntLit 5) (IntLit 6)]
 
-                    it "gives an empty list" $ forM_  exprsWithoutSymRefs $
-                        \expr -> getSymRefs expr `shouldBe` []
-            context "when Expr contains symbol refs" $ do
-                describe "getSymRefs" $ do
+                    it "gives an empty list" $ forM_  exprsWithoutVarRefs $
+                        \expr -> getVarRefs expr `shouldBe` []
+            context "when Expr contains Identifier refs" $ do
+                describe "getVarRefs" $ do
 
-                    let exprsWithSymRefs = [(SymVal "x", ["x"]), ((BinOp "+" (BinOp "-" (SymVal "y") (IntVal 5)) (SymVal "x")), ["y", "x"])]
+                    let exprsWithVarRefs = [(VarRef "x", ["x"]), ((BinOp "+" (BinOp "-" (VarRef "y") (IntLit 5)) (VarRef "x")), ["y", "x"])]
 
-                    it "gives the symbols referenced" $ forM_ exprsWithSymRefs $
-                        \(expr, symRefs) -> getSymRefs expr `shouldBe` symRefs
+                    it "gives the Identifiers referenced" $ forM_ exprsWithVarRefs $
+                        \(expr, varRefs) -> getVarRefs expr `shouldBe` varRefs
 
     describe "Stmt" $ do
-        describe "GetSymDefs" $ do
-            describe "getSymDefs" $ do
-                it "gives the symbols defined" $ do
-                    getSymDefs (Let "x" (IntVal 10)) `shouldBe` ["x"]
-        describe "GetSymRefs" $ do
-            context "when Stmt contains no symbol refs" $ do
-                describe "getSymRefs" $ do
+        describe "GetVarDefs" $ do
+            describe "getVarDefs" $ do
+                it "gives the Identifiers defined" $ do
+                    getVarDefs (Let "x" (IntLit 10)) `shouldBe` ["x"]
+        describe "GetVarRefs" $ do
+            context "when Stmt contains no Identifier refs" $ do
+                describe "getVarRefs" $ do
 
-                    let stmtsWithoutSymRefs = [Let "x" (IntVal 5)]
+                    let stmtsWithoutVarRefs = [Let "x" (IntLit 5)]
 
-                    it "gives an empty list" $ forM_  stmtsWithoutSymRefs $
-                        \expr -> getSymRefs expr `shouldBe` []
-            context "when Stmt contains symbol refs" $ do
-                describe "getSymRefs" $ do
+                    it "gives an empty list" $ forM_  stmtsWithoutVarRefs $
+                        \expr -> getVarRefs expr `shouldBe` []
+            context "when Stmt contains Identifier refs" $ do
+                describe "getVarRefs" $ do
 
-                    let stmtWithSymRefs = [(Let "x" (SymVal "y"), ["y"])]
+                    let stmtWithVarRefs = [(Let "x" (VarRef "y"), ["y"])]
 
-                    it "gives the symbols referenced" $ forM_ stmtWithSymRefs $
-                        \(expr, symRefs) -> getSymRefs expr `shouldBe` symRefs
+                    it "gives the Identifiers referenced" $ forM_ stmtWithVarRefs $
+                        \(expr, varRefs) -> getVarRefs expr `shouldBe` varRefs
 
-    describe "sortBySymDef" $ do
-        it "sorts statements that reference symbols after statemtns that define them" $ do
-            let testStmtList = [Let "y" (SymVal "x"), Let "z" (BinOp "+" (SymVal "x") (SymVal "y")), Let "x" (IntVal 5)]
-                expectedList = [Let "x" (IntVal 5), Let "y" (SymVal "x"), Let "z" (BinOp "+" (SymVal "x") (SymVal "y"))]
-             in sortBySymDef testStmtList `shouldBe` expectedList
+    describe "sortByVarDef" $ do
+        it "sorts statements that reference Identifiers after statemtns that define them" $ do
+            let testStmtList = [Let "y" (VarRef "x"), Let "z" (BinOp "+" (VarRef "x") (VarRef "y")), Let "x" (IntLit 5)]
+                expectedList = [Let "x" (IntLit 5), Let "y" (VarRef "x"), Let "z" (BinOp "+" (VarRef "x") (VarRef "y"))]
+                sortedList = sortBy sortByVarDef testStmtList
+             in sortedList `shouldBe` expectedList
+
+    describe "validateAllVarsDefined" $ do
+        context "when all Identifiers defined" $ do
+
+            let blockAllVarsDefined = Block $ [Let "x" (IntLit 5), Let "y" (VarRef "x")]
+
+            it "gives the same block from parameter" $ do
+                validateAllVarsDefined blockAllVarsDefined `shouldBe` Right blockAllVarsDefined
+
+        context "when not all Identifiers defined" $ do
+
+            let blockNotAllVarsDefined = Block $ [Let "x" (IntLit 5), Let "y" (VarRef "z")]
+
+            it "gives error with undefined Identifier" $ do
+                validateAllVarsDefined blockNotAllVarsDefined `shouldBe` Left (VarUndefinedError $ "z")
+
+    describe "validateVarsDefinedOnce" $ do
+        context "when all Identifiers defined once" $ do
+
+            let blockVarsDefOnce = Block $ [Let "x" (IntLit 5), Let "y" (VarRef "x")]
+
+            it "gives the same block from parameter" $ do
+                validateVarsDefinedOnce blockVarsDefOnce `shouldBe` Right blockVarsDefOnce
+
+        context "when var defined more than once in scope" $ do
+
+            let blockVarMoreThanOnce = Block $ [Let "x" (IntLit 5), Let "x" (IntLit 10)]
+
+            it "gives error with duplicate Identifier" $ do
+                validateVarsDefinedOnce blockVarMoreThanOnce `shouldBe` Left (VarRedefinitionError "x")
